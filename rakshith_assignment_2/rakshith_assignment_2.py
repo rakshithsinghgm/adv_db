@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 #import matplotlib as plt
 import random
-
+import snap
+import collections
+import matplotlib.pyplot as plt
 
 class Node:
    def __init__(self, index):
@@ -26,14 +28,13 @@ def er_randomGraph(n,m,p):
    edges = []
    for i in range(n):
        for(j) in range(n):
-           if random.random() < p and num_edges<=m:
+           if random.random() < p and num_edges<m:
                edges.append((i,j))
                num_edges+=1
-   print(len(edges))
    for (i,j) in edges:
       vertices[i].neighbors.append(vertices[j])
       vertices[j].neighbors.append(vertices[i])
-
+   print("At the end of er random graph gen, we have num_edges = ",num_edges)
    return vertices
 
 """ Small-World Random Network: Generate an instance from this model as follows: 
@@ -62,7 +63,7 @@ def sw_randomGraph(n):
                 #print "Attaching edge bw i and j = ",i,j
             else:
                 pass
-    print("1st round: number_edges  = ",num_edges/2)
+    #print("1st round: number_edges  = ",num_edges/2)
     count=0
     sec_round_num_edges = 0
     while count<8000:
@@ -75,18 +76,18 @@ def sw_randomGraph(n):
             sec_round_num_edges+=1
         else:
             pass
-    print("2nd round: number_edges = ",sec_round_num_edges/2)
-    print("Count = ",count)
-    print("final number of edges = ",len(edges)/2)
+    #print("2nd round: number_edges = ",sec_round_num_edges/2)
+    #print("Count = ",count)
+    #print("final number of edges = ",len(edges)/2)
     try:
         for (i,j) in edges:
             vertices[i].neighbors.append(vertices[j])
             vertices[j].neighbors.append(vertices[i])
     except:
-        print("error for i,j",i,j)
+        pass
     return vertices
 
-small_world_graph = sw_randomGraph(5242)
+#small_world_graph = sw_randomGraph(5242)
 
 """ Real-World Collaboration Network: Download this undirected network from homework folder 
 ca-GrQc.txt.gz. Nodes in this network represent authors of research papers on the arXiv 
@@ -99,7 +100,6 @@ SNAP’s LoadEdgeList function). """
 
 #Preprocessing the collab network. GetEdges() did not remove self edges 
 collab_network = snap.LoadEdgeList(snap.PUNGraph,"CA-GrQc.txt")
-print("Number of Edges in collab network is ",collab_network.GetEdges())
 
 #Code to remove self edges
 self_edge_nodes = 0
@@ -108,7 +108,6 @@ for edge in collab_network.Edges():
       src = edge.GetSrcNId()
       dst = edge.GetDstNId()
       collab_network.DelEdge(src,dst)
-print(collab_network.GetEdges())
 
 """ Question 1.1 - Plot the degree distribution of all three networks in the same plot on a
 log-log scale. In other words, generate a plot with the horizontal axis 
@@ -119,18 +118,48 @@ between the degree distribution of the collaboration network and the
 degree distributions of the random graph models. """
 
 
-def process_graph(graph):
+def generate_x_y(graph):
     #update the degrees for the random graph/network
     for node in graph:
-        if node.index not in node.neigbors:
-            node.degree = len(node.neigbors)
-        else:
-            node.degree = len(node.neigbors)+1
+        node.degree = len(node.neighbors)
+    x_list = []
+    for node in graph:
+        x_list.append(node.degree)
+    counter=collections.Counter(x_list)
+    x = [a for a in counter.keys()] # node degrees
+    tmp = counter.values() # frequency
+    y = [(x/5242)*100 for x in tmp]
+    return counter,x,y
 
+# Produce instance of and generate x,y for Erdos-Renyi Random graph
+print("Generating erdos-renyi random graph with n=5242,m=14484 and p=0.5...")
+erdos_renyi_graph = er_randomGraph(5242,14484,0.5)
+erdos_counter, erdos_x, erdos_y = generate_x_y(erdos_renyi_graph)
+print("After processing erdos-renyi graph, we have")
+print("Counter of the form degree:count",erdos_counter,"\n x axis ",erdos_x,"\n y axis",erdos_y)
+plt.loglog(erdos_x, erdos_y, color = 'y', label = 'Erdos Renyi Network')
 
-# Produce instance of Erdos-Renyi Random graph
-#erdos_renyi_graph = er_randomGraph(5242,14484,0.5)
-er_renyi_x,er_renyi_y = process_graph(erdos_renyi_graph)
+# Produce instance of and generate x,y for Small-World Random Network
+print("\nGenerating smallworld network with n=5242")
+small_world_graph = sw_randomGraph(5242)
+small_world_counter,small_world_x, small_world_y = generate_x_y(small_world_graph)
+print("After processing small world network, we have")
+print("Counter of the form degree:count",small_world_counter,"\n x axis ",small_world_x,"\n y axis",small_world_y)
+plt.loglog(small_world_x, small_world_y, linestyle = 'dashed',color = 'r', label = 'Small World Network')
 
-# Produce instance of Small-World Random Network
-#small_world_graph = sw_randomGraph(5242)
+# Generate x,y for Collab network
+collab_deg_list = []
+for node in collab_network.Nodes():
+    collab_deg_list.append(node.GetDeg())
+counter=collections.Counter(collab_deg_list)
+collab_x = [a for a in counter.keys()] # node degrees
+tmp = counter.values() # frequency
+collab_y = [(x/5242)*100 for x in tmp]
+plt.loglog(collab_x, collab_y, linestyle = 'dotted',color = 'g', label = 'Collab Network')
+
+plt.xlabel('Node Degree (log)')
+plt.ylabel('Proportion of Nodes with a Given Degree (log)')
+plt.title('Degree Distribution of Erdos Renyi, Small World, and Collaboration Networks')
+plt.legend()
+plt.savefig("out.png")
+#plt.show()
